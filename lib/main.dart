@@ -1,11 +1,19 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'camera_page.dart';
 
-void main() {
-  runApp(const AIWorldApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final cameras = await availableCameras();
+
+  runApp(AIWorldApp(cameras: cameras));
 }
 
 class AIWorldApp extends StatelessWidget {
-  const AIWorldApp({super.key});
+  final List<CameraDescription> cameras;
+
+  const AIWorldApp({super.key, required this.cameras});
 
   @override
   Widget build(BuildContext context) {
@@ -13,59 +21,67 @@ class AIWorldApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'AI World',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const AIWorldHomePage(),
+      home: HomePage(cameras: cameras),
     );
   }
 }
 
-class AIWorldHomePage extends StatelessWidget {
-  const AIWorldHomePage({super.key});
+// ─────────────────────────────────────────────
+// ГЛАВНЫЙ ЭКРАН
+// ─────────────────────────────────────────────
+
+class HomePage extends StatelessWidget {
+  final List<CameraDescription> cameras;
+
+  const HomePage({super.key, required this.cameras});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'AI World',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
+      appBar: AppBar(title: const Text('AI WORLD'), centerTitle: true),
+      body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Spacer(),
-
               const Icon(Icons.public, size: 100),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 30),
 
               const Text(
-                'Я готов увидеть мир',
+                'Добро пожаловать в AI World!',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
               const Text(
-                'Покажи мне то, что хочешь узнать.',
+                'AI, который понимает окружающий мир.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 17),
+                style: TextStyle(fontSize: 18),
               ),
 
               const SizedBox(height: 40),
 
               SizedBox(
                 width: double.infinity,
-                height: 56,
+                height: 55,
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: cameras.isEmpty
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CameraPage(cameras: cameras),
+                            ),
+                          );
+                        },
                   icon: const Icon(Icons.camera_alt),
                   label: const Text(
                     'Открыть камеру',
@@ -73,23 +89,6 @@ class AIWorldHomePage extends StatelessWidget {
                   ),
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.mic),
-                  label: const Text(
-                    'Спросить голосом',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                ),
-              ),
-
-              const Spacer(),
             ],
           ),
         ),

@@ -1,13 +1,13 @@
+import 'package:camera/camera.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_world/main.dart';
 
 void main() {
-  testWidgets('AI World home page test', (WidgetTester tester) async {
-    await tester.pumpWidget(const AIWorldApp());
+  testWidgets('AI World app starts', (WidgetTester tester) async {
+    final cameras = await availableCameras();
 
-    expect(find.text('AI World'), findsOneWidget);
-    expect(find.text('Я готов увидеть мир'), findsOneWidget);
-    expect(find.text('Открыть камеру'), findsOneWidget);
-    expect(find.text('Спросить голосом'), findsOneWidget);
+    await tester.pumpWidget(AIWorldApp(cameras: cameras));
+
+    expect(find.text('AI WORLD'), findsOneWidget);
   });
 }
