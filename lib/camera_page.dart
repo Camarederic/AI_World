@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
+import 'ai_frame.dart';
 import 'frame_processor.dart';
 
 class CameraPage extends StatefulWidget {
@@ -44,7 +44,7 @@ class _CameraPageState extends State<CameraPage> {
   int _imageWidth = 0;
   int _imageHeight = 0;
 
-  Uint8List? _lastJpeg;
+  AiFrame? _lastAiFrame;
 
   @override
   void initState() {
@@ -124,25 +124,25 @@ class _CameraPageState extends State<CameraPage> {
     // Этот счётчик используется для расчёта реального FPS.
     _fpsFrameCount++;
 
-    final jpeg = _frameProcessor.process(
+    final aiFrame = _frameProcessor.process(
       image,
       widget.cameras[_currentCameraIndex].lensDirection,
     );
 
-    if (jpeg != null) {
+    if (aiFrame != null) {
       _processedFrames++;
 
       if (mounted) {
         setState(() {
-          _lastJpeg = jpeg;
+          _lastAiFrame = aiFrame;
         });
       }
 
       debugPrint(
         'AI обработал кадр #$_processedFrames | '
         'получено: $_receivedFrames | '
-        'размер: ${image.width}x${image.height} | '
-        'JPEG: ${jpeg.length} байт',
+        'размер: ${aiFrame.width}x${aiFrame.height} | '
+        'JPEG: ${aiFrame.imageBytes.length} байт',
       );
     }
 
@@ -281,7 +281,7 @@ class _CameraPageState extends State<CameraPage> {
         children: [
           CameraPreview(_controller!),
 
-          if (_lastJpeg != null)
+          if (_lastAiFrame != null)
             Positioned(
               bottom: 120,
               left: 20,
@@ -290,7 +290,7 @@ class _CameraPageState extends State<CameraPage> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Image.memory(
-                  _lastJpeg!,
+                  _lastAiFrame!.imageBytes,
                   fit: BoxFit.contain,
                   gaplessPlayback: true,
                 ),
