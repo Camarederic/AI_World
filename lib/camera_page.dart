@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
-import 'image_converter.dart';
+import 'frame_processor.dart';
 
 class CameraPage extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -17,6 +17,8 @@ class CameraPage extends StatefulWidget {
 
 class _CameraPageState extends State<CameraPage> {
   CameraController? _controller;
+
+  final FrameProcessor _frameProcessor = FrameProcessor();
 
   int _currentCameraIndex = 0;
 
@@ -31,9 +33,6 @@ class _CameraPageState extends State<CameraPage> {
 
   // Реальный FPS входящего потока CameraImage.
   double _fps = 0.0;
-
-  // Время последнего обработанного кадра.
-  DateTime? _lastProcessedTime;
 
   // Счётчики для расчёта FPS.
   DateTime? _fpsStartTime;
@@ -82,7 +81,6 @@ class _CameraPageState extends State<CameraPage> {
       _fps = 0.0;
       _fpsFrameCount = 0;
       _fpsStartTime = null;
-      _lastProcessedTime = null;
       _imageWidth = 0;
       _imageHeight = 0;
 
@@ -126,23 +124,15 @@ class _CameraPageState extends State<CameraPage> {
     // Этот счётчик используется для расчёта реального FPS.
     _fpsFrameCount++;
 
-    // Пока просто имитируем будущую обработку AI.
-    //
-    // Не будем обрабатывать каждый кадр.
-    // Максимум один кадр примерно каждые 500 мс.
-    final now = DateTime.now();
+    final jpeg = _frameProcessor.process(
+      image,
+      widget.cameras[_currentCameraIndex].lensDirection,
+    );
 
-    if (_lastProcessedTime == null ||
-        now.difference(_lastProcessedTime!).inMilliseconds >= 200) {
-      _lastProcessedTime = now;
+    if (jpeg != null) {
       _processedFrames++;
 
-      final jpeg = ImageConverter.convertCameraImage(
-        image,
-        widget.cameras[_currentCameraIndex].lensDirection,
-      );
-
-      if (jpeg != null && mounted) {
+      if (mounted) {
         setState(() {
           _lastJpeg = jpeg;
         });
@@ -152,7 +142,7 @@ class _CameraPageState extends State<CameraPage> {
         'AI обработал кадр #$_processedFrames | '
         'получено: $_receivedFrames | '
         'размер: ${image.width}x${image.height} | '
-        'JPEG: ${jpeg?.length ?? 0} байт',
+        'JPEG: ${jpeg.length} байт',
       );
     }
 
