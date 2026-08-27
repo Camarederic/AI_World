@@ -3,8 +3,10 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:image/image.dart' as img;
 
+import 'image_conversion_result.dart';
+
 class ImageConverter {
-  static Uint8List? convertCameraImage(
+  static ImageConversionResult? convertCameraImage(
     CameraImage image,
     CameraLensDirection lensDirection,
   ) {
@@ -66,6 +68,8 @@ class ImageConverter {
       result = img.copyRotate(result, angle: -90);
     }
 
-    return Uint8List.fromList(img.encodeJpg(result, quality: 90));
+    final jpegBytes = Uint8List.fromList(img.encodeJpg(result, quality: 90));
+
+    return ImageConversionResult(image: result, jpegBytes: jpegBytes);
   }
 }

@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'ai_frame.dart';
 import 'frame_processor.dart';
 
+import 'ai_model.dart';
+
 class CameraPage extends StatefulWidget {
   final List<CameraDescription> cameras;
 
@@ -19,6 +21,11 @@ class _CameraPageState extends State<CameraPage> {
   CameraController? _controller;
 
   final FrameProcessor _frameProcessor = FrameProcessor();
+
+  final AiModel _aiModel = AiModel();
+
+  bool _aiModelReady = false;
+  bool _hasRunFirstInference = false;
 
   int _currentCameraIndex = 0;
 
@@ -49,7 +56,22 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void initState() {
     super.initState();
+
+    _initializeAiModel();
     _initializeCamera();
+  }
+
+  Future<void> _initializeAiModel() async {
+    debugPrint('AI MODEL: начинаем загрузку');
+
+    try {
+      await _aiModel.initialize();
+      _aiModelReady = true;
+
+      debugPrint('AI MODEL: модель успешно загружена');
+    } catch (e) {
+      debugPrint('AI MODEL ERROR: $e');
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -124,13 +146,16 @@ class _CameraPageState extends State<CameraPage> {
     // Этот счётчик используется для расчёта реального FPS.
     _fpsFrameCount++;
 
-    final aiFrame = _frameProcessor.process(
+    final processedFrame = _frameProcessor.process(
       image,
       widget.cameras[_currentCameraIndex].lensDirection,
     );
 
-    if (aiFrame != null) {
+    if (processedFrame != null) {
       _processedFrames++;
+
+      final aiFrame = processedFrame.aiFrame;
+      final aiInput = processedFrame.aiInput;
 
       if (mounted) {
         setState(() {
@@ -142,8 +167,17 @@ class _CameraPageState extends State<CameraPage> {
         'AI обработал кадр #$_processedFrames | '
         'получено: $_receivedFrames | '
         'размер: ${aiFrame.width}x${aiFrame.height} | '
-        'JPEG: ${aiFrame.imageBytes.length} байт',
+        'JPEG: ${aiFrame.imageBytes.length} байт | '
+        'AI INPUT: ${aiInput.width}x${aiInput.height}',
       );
+
+      if (_aiModelReady && !_hasRunFirstInference) {
+        _hasRunFirstInference = true;
+
+        debugPrint('AI INFERENCE: запускаем первый inference');
+
+        _aiModel.detect(aiInput);
+      }
     }
 
     // Каждые 30 полученных кадров выводим диагностику.
@@ -257,6 +291,7 @@ class _CameraPageState extends State<CameraPage> {
     }
 
     controller?.dispose();
+    _aiModel.dispose();
 
     super.dispose();
   }
