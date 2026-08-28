@@ -4,6 +4,8 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import 'ai_frame.dart';
+import 'detection.dart';
+import 'detection_overlay.dart';
 import 'frame_processor.dart';
 
 import 'ai_model.dart';
@@ -52,6 +54,7 @@ class _CameraPageState extends State<CameraPage> {
   int _imageHeight = 0;
 
   AiFrame? _lastAiFrame;
+  List<Detection> _detections = [];
 
   @override
   void initState() {
@@ -176,7 +179,13 @@ class _CameraPageState extends State<CameraPage> {
 
         debugPrint('AI INFERENCE: запускаем первый inference');
 
-        _aiModel.detect(aiInput);
+        final detections = _aiModel.detect(aiInput);
+
+        if (detections != null && mounted) {
+          setState(() {
+            _detections = detections;
+          });
+        }
       }
     }
 
@@ -315,6 +324,8 @@ class _CameraPageState extends State<CameraPage> {
         fit: StackFit.expand,
         children: [
           CameraPreview(_controller!),
+
+          if (_detections.isNotEmpty) DetectionOverlay(detections: _detections),
 
           if (_lastAiFrame != null)
             Positioned(
