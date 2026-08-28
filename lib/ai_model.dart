@@ -1,15 +1,33 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 
 import 'ai_input.dart';
+import 'detection.dart';
 
 class AiModel {
   Interpreter? _interpreter;
+
+  List<String> _labels = [];
+
+  static const double confidenceThreshold = 0.5;
 
   Future<void> initialize() async {
     _interpreter = await Interpreter.fromAsset(
       'assets/models/efficientdet-lite0.tflite',
     );
+
+    final labelsText = await rootBundle.loadString(
+      'assets/labels/coco_labels.txt',
+    );
+
+    _labels = labelsText
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+
+    debugPrint('AI MODEL: загружено labels: ${_labels.length}');
 
     final inputTensors = _interpreter!.getInputTensors();
     final outputTensors = _interpreter!.getOutputTensors();
@@ -36,7 +54,7 @@ class AiModel {
     }
   }
 
-  List<dynamic>? detect(AiInput input) {
+  List<Detection>? detect(AiInput input) {
     if (_interpreter == null) {
       debugPrint('AI MODEL ERROR: модель не загружена');
       return null;
@@ -90,22 +108,53 @@ class AiModel {
 
     debugPrint('AI INFERENCE: ${stopwatch.elapsedMilliseconds} ms');
 
-    debugPrint('AI DETECTIONS: ${outputCount[0]}');
+    final detections = <Detection>[];
 
     for (var i = 0; i < 25; i++) {
       final score = outputScores[0][i];
 
-      if (score > 0.3) {
-        debugPrint(
-          'Detection #$i | '
-          'class=${outputClasses[0][i]} | '
-          'score=$score | '
-          'box=${outputBoxes[0][i]}',
-        );
+      if (score < confidenceThreshold) {
+        continue;
       }
+
+      final classId = outputClasses[0][i].toInt();
+
+      final label = classId >= 0 && classId < _labels.length
+          ? _labels[classId]
+          : 'unknown';
+
+      final box = outputBoxes[0][i];
+
+      detections.add(
+        Detection(
+          label: label,
+          classId: classId,
+          score: score,
+          top: box[0],
+          left: box[1],
+          bottom: box[2],
+          right: box[3],
+        ),
+      );
     }
 
-    return [outputBoxes, outputClasses, outputScores, outputCount];
+    debugPrint('AI DETECTIONS: ${detections.length}');
+
+    for (final detection in detections) {
+      debugPrint(
+        'OBJECT: ${detection.label} | '
+        'class=${detection.classId} | '
+        'score=${(detection.score * 100).toStringAsFixed(1)}% | '
+        'box=['
+        '${detection.top.toStringAsFixed(3)}, '
+        '${detection.left.toStringAsFixed(3)}, '
+        '${detection.bottom.toStringAsFixed(3)}, '
+        '${detection.right.toStringAsFixed(3)}'
+        ']',
+      );
+    }
+
+    return detections;
   }
 
   void dispose() {
