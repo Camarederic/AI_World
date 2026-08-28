@@ -9,6 +9,7 @@ import 'detection_overlay.dart';
 import 'frame_processor.dart';
 
 import 'ai_model.dart';
+import 'ai_input.dart';
 
 class CameraPage extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -27,7 +28,6 @@ class _CameraPageState extends State<CameraPage> {
   final AiModel _aiModel = AiModel();
 
   bool _aiModelReady = false;
-  bool _hasRunFirstInference = false;
 
   int _currentCameraIndex = 0;
 
@@ -49,12 +49,54 @@ class _CameraPageState extends State<CameraPage> {
 
   Timer? _fpsTimer;
 
+  Timer? _aiTimer;
+
   // Размер последнего полученного кадра.
   int _imageWidth = 0;
   int _imageHeight = 0;
 
   AiFrame? _lastAiFrame;
   List<Detection> _detections = [];
+
+  AiInput? _latestAiInput;
+
+  bool _isAiProcessing = false;
+
+  void _startAiProcessing() {
+    _aiTimer?.cancel();
+
+    _aiTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
+      if (!_aiModelReady) {
+        return;
+      }
+
+      if (_isAiProcessing) {
+        return;
+      }
+
+      final input = _latestAiInput;
+
+      if (input == null) {
+        return;
+      }
+
+      _isAiProcessing = true;
+
+      try {
+        debugPrint('AI INFERENCE: запускаем inference');
+
+        final detections = _aiModel.detect(input);
+
+        if (detections != null && mounted) {
+          setState(() {
+            _detections = detections;
+          });
+        }
+      } finally {
+        _isAiProcessing = false;
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -114,6 +156,7 @@ class _CameraPageState extends State<CameraPage> {
       });
 
       _startFpsCalculation();
+      _startAiProcessing();
 
       await _startImageStream();
     } on CameraException catch (e) {
@@ -138,15 +181,11 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   void _processCameraFrame(CameraImage image) {
-    // Каждый вызов этого метода означает,
-    // что CameraImage действительно пришёл от камеры.
     _receivedFrames++;
 
-    // Запоминаем реальное разрешение кадра.
     _imageWidth = image.width;
     _imageHeight = image.height;
 
-    // Этот счётчик используется для расчёта реального FPS.
     _fpsFrameCount++;
 
     final processedFrame = _frameProcessor.process(
@@ -159,6 +198,8 @@ class _CameraPageState extends State<CameraPage> {
 
       final aiFrame = processedFrame.aiFrame;
       final aiInput = processedFrame.aiInput;
+
+      _latestAiInput = aiInput;
 
       if (mounted) {
         setState(() {
@@ -173,23 +214,8 @@ class _CameraPageState extends State<CameraPage> {
         'JPEG: ${aiFrame.imageBytes.length} байт | '
         'AI INPUT: ${aiInput.width}x${aiInput.height}',
       );
-
-      if (_aiModelReady && !_hasRunFirstInference) {
-        _hasRunFirstInference = true;
-
-        debugPrint('AI INFERENCE: запускаем первый inference');
-
-        final detections = _aiModel.detect(aiInput);
-
-        if (detections != null && mounted) {
-          setState(() {
-            _detections = detections;
-          });
-        }
-      }
     }
 
-    // Каждые 30 полученных кадров выводим диагностику.
     if (_receivedFrames % 30 == 0) {
       debugPrint(
         'Получено: $_receivedFrames | '
@@ -200,7 +226,6 @@ class _CameraPageState extends State<CameraPage> {
       );
     }
 
-    // Не перестраиваем интерфейс на каждом кадре.
     if (_receivedFrames % 10 == 0 && mounted) {
       setState(() {});
     }
@@ -292,6 +317,7 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void dispose() {
     _fpsTimer?.cancel();
+    _aiTimer?.cancel();
 
     final controller = _controller;
 
